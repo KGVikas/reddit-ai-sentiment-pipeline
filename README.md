@@ -38,6 +38,7 @@ Streamlit (reads csv_data/latest.csv)
 
 ## 📁 Repository Structure
 
+```
 ├── README.md
 ├── lambda-extractor/ # Extract Lambda code 
 │ └── lambda_function.py
@@ -48,6 +49,7 @@ Streamlit (reads csv_data/latest.csv)
 ├── assets/
 │ └── architecture.png 
 ├── requirements.txt
+```
 
 ---
 
