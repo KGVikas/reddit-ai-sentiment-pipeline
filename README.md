@@ -26,12 +26,12 @@ This project demonstrates a full serverless ETL + ML flow:
 
 ---
 
-**Pipeline (brief)**:
+## Execution Video
 
-Reddit (PRAW) → Lambda (extract) → S3 raw_data/to_process/
-S3 PUT → Lambda (sentiment) → S3 processed_data/ + csv_data/
-↓
-Streamlit (reads csv_data/latest.csv)
+
+
+https://github.com/user-attachments/assets/2add6c18-dc0f-4d86-a456-b65f59591984
+
 
 
 ---
@@ -50,9 +50,6 @@ Streamlit (reads csv_data/latest.csv)
 │ └── architecture.png 
 ├── requirements.txt
 ```
-
----
-
 
 ---
 
