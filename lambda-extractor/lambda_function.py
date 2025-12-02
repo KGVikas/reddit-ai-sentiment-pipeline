@@ -22,17 +22,35 @@ def fetch_posts_from_subreddit(reddit, name, limit):
     for post in subreddit.hot(limit=limit):
         created_time = datetime.fromtimestamp(post.created_utc, tz=timezone.utc)
         created_at = created_time.strftime("%Y-%m-%d %H:%M:%S UTC")
-        posts.append({
-            "Subreddit": name,
-            "id": post.id,
-            "Title": post.title,
-            "Author": str(post.author),
-            "Score": post.score,
-            "Number of Comments": post.num_comments,
-            "Time of Creation": created_at,
-            "URL": post.url,
-            "Permalink": f"https://www.reddit.com{post.permalink}"
-        })
+
+        # Required-field validation
+        required_fields = ["id", "title", "author", "score"]
+        raw = vars(post)
+        missing_fields = [f for f in required_fields if raw.get(f) is None]
+        if missing_fields:
+            continue
+        
+        # Null / empty value handling
+        if not post.title or post.title.strip()=="":
+            continue
+        safe_author=str(post.author) if post.author else "unknown_author"
+
+        clean_post = {
+            "subreddit": name,
+            "id": str(post.id),
+            "title": post.title.strip(),
+            "author": safe_author,
+            "score": int(post.score),
+            "num_comments": int(post.num_comments),
+            "created_at": created_at,
+            "url": post.url,
+            "permalink": f"https://www.reddit.com{post.permalink}",
+        }
+
+        clean_post["validation_status"] = "passed"
+    
+    posts.append(clean_post)
+
     return posts
 
 def lambda_handler(event, context):
@@ -79,3 +97,4 @@ def lambda_handler(event, context):
         "count": len(deduped_posts),
         "s3_key": s3_key
     }
+
