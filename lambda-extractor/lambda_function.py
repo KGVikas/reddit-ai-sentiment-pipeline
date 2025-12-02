@@ -16,9 +16,12 @@ S3_PREFIX = os.environ.get("S3_PREFIX", "raw_data/to_process/")
 
 s3 = boto3.client("s3", region_name="us-east-1")
 
+from datetime import datetime, timezone
+
 def fetch_posts_from_subreddit(reddit, name, limit):
     posts = []
     subreddit = reddit.subreddit(name)
+
     for post in subreddit.hot(limit=limit):
         created_time = datetime.fromtimestamp(post.created_utc, tz=timezone.utc)
         created_at = created_time.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -32,27 +35,28 @@ def fetch_posts_from_subreddit(reddit, name, limit):
 
         title = (post.title or "").strip()
         if title == "":
-            title = "[no_title]"
+            continue
 
-        # --- Safe author handling (unchanged) ---
+        # Safe author handling
         safe_author = str(post.author) if post.author else "unknown_author"
 
         clean_post = {
             "subreddit": name,
             "id": str(post.id),
-            "title": post.title.strip(),
+            "title": title,                        
             "author": safe_author,
-            "score": int(post.score),
-            "num_comments": int(post.num_comments),
+            "score": int(post.score) if post.score is not None else 0,
+            "num_comments": int(post.num_comments) if post.num_comments is not None else 0,
             "created_at": created_at,
-            "url": post.url,
-            "permalink": f"https://www.reddit.com{post.permalink}",
+            "url": post.url or "",
+            "permalink": f"https://www.reddit.com{post.permalink}" if getattr(post, "permalink", None) else "",
         }
 
         clean_post["validation_status"] = "passed"
         posts.append(clean_post)
 
     return posts
+
 
 def lambda_handler(event, context):
     # Read Reddit credentials
@@ -98,6 +102,3 @@ def lambda_handler(event, context):
         "count": len(deduped_posts),
         "s3_key": s3_key
     }
-
-
-
