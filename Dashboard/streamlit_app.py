@@ -3,6 +3,7 @@ import boto3
 import pandas as pd
 from io import StringIO
 from sklearn.feature_extraction.text import TfidfVectorizer
+import ast
 
 # ---------- AWS Setup ----------
 S3_BUCKET = "reddit-ml-vikas"
@@ -36,23 +37,63 @@ st.caption("Automated pipeline using AWS Lambda, S3, and Comprehend — visualiz
 
 df = get_latest_csv_from_s3()
 
+# Make common column name fallbacks so later code that expects Title/Author/URL/Subreddit works
+if "Author" not in df.columns and "author" in df.columns:
+    df["Author"] = df["author"]
+if "Title" not in df.columns and "title" in df.columns:
+    df["Title"] = df["title"]
+if "URL" not in df.columns and "url" in df.columns:
+    df["URL"] = df["url"]
+if "Subreddit" not in df.columns and "subreddit" in df.columns:
+    df["Subreddit"] = df["subreddit"]
+
+# Ensure a Sentiment column exists 
+def derive_label_from_score(x):
+    try:
+        d = ast.literal_eval(x) if isinstance(x, str) else {}
+        if not d:
+            return "NEUTRAL"
+        return "POSITIVE" if d.get("Positive", 0) >= d.get("Negative", 0) else "NEGATIVE"
+    except Exception:
+        return "NEUTRAL"
+
+if "Sentiment" not in df.columns:
+    if "SentimentScore" in df.columns:
+        df["Sentiment"] = df["SentimentScore"].apply(derive_label_from_score)
+    else:
+        df["Sentiment"] = "NEUTRAL"
+
 # ---------- Overview ----------
 st.subheader("Dataset Overview")
 st.write(df.head())
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Posts", len(df))
-col2.metric("Positive Posts", (df['Sentiment'] == 'POSITIVE').sum())
-col3.metric("Negative Posts", (df['Sentiment'] == 'NEGATIVE').sum())
+col2.metric("Positive Posts", int((df["Sentiment"] == "POSITIVE").sum()))
+col3.metric("Negative Posts", int((df["Sentiment"] == "NEGATIVE").sum()))
+col4.metric("Neutral Posts", int((df["Sentiment"] == "NEUTRAL").sum()))
 
 
 # ---------- Top Authors by Sentiment ----------
 st.subheader("🏆 Top Authors by Average Sentiment Score")
 
-# Convert SentimentScore string to usable numeric (Positive - Negative)
-df["NetSentiment"] = df["SentimentScore"].apply(
-    lambda x: eval(x)["Positive"] - eval(x)["Negative"] if isinstance(x, str) else 0
-)
+# ---------- SentimentScore parsing ----------
+def parse_score(x):
+    try:
+        d = ast.literal_eval(x) if isinstance(x, str) else {}
+        return {"Positive": float(d.get("Positive", 0)), "Negative": float(d.get("Negative", 0))}
+    except Exception:
+        return {"Positive": 0.0, "Negative": 0.0}
+
+if "SentimentScore" in df.columns:
+    scores = df["SentimentScore"].apply(parse_score)
+    df["Positive"] = scores.apply(lambda d: d["Positive"])
+    df["Negative"] = scores.apply(lambda d: d["Negative"])
+    df["NetSentiment"] = df["Positive"] - df["Negative"]
+else:
+    df["Positive"] = 0.0
+    df["Negative"] = 0.0
+    df["NetSentiment"] = 0.0
 
 author_sentiment = (
     df.groupby("Author")["NetSentiment"]
@@ -68,10 +109,6 @@ st.bar_chart(author_sentiment)
 st.subheader("📊 Sentiment Distribution")
 sentiment_counts = df['Sentiment'].value_counts()
 st.bar_chart(sentiment_counts)
-
-# ---------- Compute Scores ----------
-df["Positive"] = df["SentimentScore"].apply(lambda x: eval(x)["Positive"] if isinstance(x, str) else 0)
-df["Negative"] = df["SentimentScore"].apply(lambda x: eval(x)["Negative"] if isinstance(x, str) else 0)
 
 # ---------- Clickable Links ----------
 def make_clickable(url):
@@ -133,14 +170,9 @@ st.write(
     unsafe_allow_html=True
 )
 
-
-
-
-
-
 st.subheader("💬 Distinctive Keywords in Positive Posts")
 
-positive_titles = df[df["Sentiment"] == "POSITIVE"]["Title"].dropna().tolist()
+positive_titles = df[df["Sentiment"] == "POSITIVE"].get("Title", pd.Series(dtype=str)).dropna().tolist()
 
 if positive_titles:
     vectorizer = TfidfVectorizer(stop_words="english", max_features=15)
@@ -153,10 +185,7 @@ else:
     st.info("No positive posts found to extract keywords.")
 
 
-
 # ---------- Trend Analysis ----------
 st.subheader("📈 Sentiment by Subreddit")
 trend = df.groupby("Subreddit")["Sentiment"].value_counts().unstack().fillna(0)
 st.bar_chart(trend)
-
-
