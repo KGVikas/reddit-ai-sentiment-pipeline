@@ -49,7 +49,7 @@ def fetch_posts_from_subreddit(reddit, name, limit):
 
         clean_post["validation_status"] = "passed"
     
-    posts.append(clean_post)
+        posts.append(clean_post)
 
     return posts
 
@@ -97,4 +97,5 @@ def lambda_handler(event, context):
         "count": len(deduped_posts),
         "s3_key": s3_key
     }
+
 
