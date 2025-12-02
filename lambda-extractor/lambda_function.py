@@ -24,16 +24,18 @@ def fetch_posts_from_subreddit(reddit, name, limit):
         created_at = created_time.strftime("%Y-%m-%d %H:%M:%S UTC")
 
         # Required-field validation
-        required_fields = ["id", "title", "author", "score"]
+        required_fields = ["id", "title", "score"]
         raw = vars(post)
         missing_fields = [f for f in required_fields if raw.get(f) is None]
         if missing_fields:
             continue
-        
-        # Null / empty value handling
-        if not post.title or post.title.strip()=="":
-            continue
-        safe_author=str(post.author) if post.author else "unknown_author"
+
+        title = (post.title or "").strip()
+        if title == "":
+            title = "[no_title]"
+
+        # --- Safe author handling (unchanged) ---
+        safe_author = str(post.author) if post.author else "unknown_author"
 
         clean_post = {
             "subreddit": name,
@@ -48,7 +50,6 @@ def fetch_posts_from_subreddit(reddit, name, limit):
         }
 
         clean_post["validation_status"] = "passed"
-    
         posts.append(clean_post)
 
     return posts
@@ -97,5 +98,6 @@ def lambda_handler(event, context):
         "count": len(deduped_posts),
         "s3_key": s3_key
     }
+
 
 
