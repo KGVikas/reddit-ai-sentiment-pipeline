@@ -6,7 +6,7 @@ An end-to-end, serverless pipeline that automates extraction of Reddit posts, ru
 
 ## 🚀 Project Summary
 This project demonstrates a full serverless ETL + ML flow:
-- **Extractor Lambda** (Python + `praw`) fetches posts from configured subreddits and stores deduplicated JSON in S3.
+- **Extractor Lambda** (Python + `praw`) fetches posts from configured subreddits, applies a data validation layer (missing-field checks, null filtering, schema normalization), and stores clean, structured JSON in S3.
 - **Sentiment Lambda** (Python + `boto3`) is triggered by S3 `PUT` events, calls **Amazon Comprehend**, enriches data with sentiment labels & scores, and writes both JSON and CSV outputs to S3.
 - **Streamlit Dashboard** reads the latest CSV from S3 and visualizes KPIs, sentiment distribution, top authors, distinctive keywords, and clickable post links.
 
@@ -17,6 +17,12 @@ This project demonstrates a full serverless ETL + ML flow:
 - Data saved as both **JSON** (processed_data/) and **CSV** (csv_data/) for analysis.
 - Streamlit dashboard auto-loads the latest CSV and supports subreddit filtering, limited-preview table, top-author metrics, TF-IDF keywords, and clickable links.
 - Cost-conscious design (uses Lambda + Comprehend pay-per-use; fits comfortably within a small monthly budget).
+- Added a data validation layer before ingestion, including:
+  - missing-field checks (id, title, author, score)
+  - null/empty-title filtering
+  - schema normalization (consistent typing + cleaned keys)
+  - safe handling of unknown authors
+- Enforced structured output with a `validation_status` flag on each record.
 
 ---
 
@@ -96,6 +102,12 @@ Create an IAM role for Lambda with the following managed policies (or create lea
 - Handler: `lambda_function.lambda_handler`
 - Memory: 256 MB, Timeout: 30–60s
 - Behavior: fetches posts, deduplicates by `id`, writes JSON to `raw_data/to_process/`.
+- Integrated a **data validation layer** before writing to S3:
+  - Ensures required fields exist  
+  - Skips posts with missing/invalid data  
+  - Normalizes schema (string IDs, cleaned titles, typed scores)  
+  - Adds a `validation_status` flag to each record  
+
 
 ---
 
